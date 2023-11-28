@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DDA 2003/MDS 6112</title>
+    <meta charset="UTF-8">
+</head>
+<body> 
+    <h1>Graph Visualization with Force-Directed Layout</h1>
+    
+    <div id="force-directed-graph" >
+    </div>
+    <div id="global-view">
+    </div>
+    <script src="js/d3.v6.min.js"></script>
+    <script>
+        
+            
+    const margin = {top: 25, right: 20, bottom: 20, left: 35},
+    width = 800 - margin.left - margin.right,
+    height = 800 - margin.top - margin.bottom;
+
+
+    const svg = d3.select("#force-directed-graph")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform",`translate(${margin.left}, ${margin.top})`);
+    const svgBorder = svg.append("rect")
+        .attr("width", width)
+        .attr("height", height)
+        .style("stroke", "blue")
+        .style("stroke-width", 2)
+        .style("fill", "none");
+
+    const color = d3.scaleOrdinal(d3.schemeTableau10);
+    
+    // Show a global view of the graph
+    const globalView = d3.select("#force-directed-graph")
+        .append("svg")
+        .attr("width", width / 4 + margin.left + margin.right)
+        .attr("height", height / 4 + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`);
+    const globalViewBorder = globalView.append("rect")
+        .attr("width", width / 4)
+        .attr("height", height / 4)
+        .style("stroke", "black")
+        .style("stroke-width", 2)
+        .style("fill", "none");
+    const globalScale = 0.25;
+
+
+    d3.json("data/miserables.json").then(function(data) {
+        console.log(data);
+    // Create circles and lines for nodes and edges, respectively.
+    const link = svg.append("g")
+        .selectAll("line")
+        .data(data.links)
+        .join("line")
+        .style("stroke", "#000000")
+        .style("stroke-width", (d) => d.value*0.2);
+
+    
+    const node = svg.append("g")
+        .selectAll("circle")
+        .data(data.nodes)
+        .join("circle")
+        .attr("r", 5)
+        .style("fill", (d) => color(d.group))
+        .style("stroke", "black")
+        .style("stroke-width", 1);
+    
+    //Create a tooltip for show node information.
+    const tooltip = svg.append("g")
+        .attr("class", "tooltip")
+        .style("opacity", 1);
+            
+    const globalLink = globalView.append("g")
+        .selectAll("line")
+        .data(data.links)
+        .join("line")
+        .style("stroke", "#000000")
+        .style("stroke-width", (d) => d.value * 0.2);
+
+    const globalNode = globalView.append("g")
+        .selectAll("circle")
+        .data(data.nodes)
+        .join("circle")
+        .attr("r", 5 * globalScale)
+        .style("fill", (d) => color(d.group))
+        .style("stroke", "black")
+        .style("stroke-width", 1 * globalScale);
+    // Create a force-directed layout
+    const simulation = d3.forceSimulation(data.nodes)
+        .force("link", d3.forceLink().links(data.links).id((d) => d.id))
+        .force("charge", d3.forceManyBody())
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .on("tick", ticked);
+    
+    
+    
+    const numNodes = data.nodes.length;
+    const adjacencyMatrix = new Array(numNodes);
+    for (let i = 0; i < numNodes; i++) {
+        adjacencyMatrix[i] = new Array(numNodes).fill(0);
+    }
+    
+
+    for (let i = 0; i < data.links.length; i++) {
+        
+        const link = data.links[i];
+        let sourceIndex = -1;
+        let targetIndex = -1;
+        for (let j = 0; j < data.nodes.length; j++) {
+            if (data.nodes[j].id === link.source.id) {
+            sourceIndex = j;
+            }
+            if (data.nodes[j].id === link.target.id) {
+            targetIndex = j;
+            }
+            if (sourceIndex >= 0 && targetIndex >= 0) {
+            break;
+            }
+        }
+        if (sourceIndex >= 0 && targetIndex >= 0) {
+            adjacencyMatrix[sourceIndex][targetIndex] = 1;
+            adjacencyMatrix[targetIndex][sourceIndex] = 1;
+        }
+    }
+
+    function isConnected(source, target) {
+        const sourceIndex = source.index;
+        const targetIndex = target.index;
+        return adjacencyMatrix[sourceIndex][targetIndex] === 1;
+    }
+    function getNeighbors(node) {
+        const neighbors = {nodes: [],edges: []};
+
+        data.nodes.forEach(function(n) {
+            if (isConnected(node, n)) {
+            neighbors.nodes.push(n);
+            }
+        });
+
+        data.links.forEach(function(e) {
+            if (e.source === node || e.target === node) {
+            neighbors.edges.push(e);
+            }
+        });
+
+        return neighbors;
+    }
+    // Visualize graph.
+    function ticked() {
+        link
+            .attr("x1", (d) => d.source.x)
+            .attr("y1", (d) => d.source.y)
+            .attr("x2", (d) => d.target.x)
+            .attr("y2", (d) => d.target.y);
+
+        node
+            .attr("cx", (d) => d.x)
+            .attr("cy", (d) => d.y);
+        globalLink
+            .attr("x1", (d) => d.source.x * globalScale)
+            .attr("y1", (d) => d.source.y * globalScale)
+            .attr("x2", (d) => d.target.x * globalScale)
+            .attr("y2", (d) => d.target.y * globalScale);
+
+        globalNode
+            .attr("cx", (d) => d.x * globalScale)
+            .attr("cy", (d) => d.y * globalScale);
+    }
+    
+    // Build interaction for hovering nodes.
+    node.on("mousemove", function(d) {
+        const [x, y] = d3.pointer(event);
+        
+        const mousePos = { x, y };
+        let currentNode = null;
+
+        data.nodes.forEach(node => {
+            const nodePos = { x: node.x, y: node.y };
+            const distance = Math.sqrt((nodePos.x - mousePos.x) ** 2 + (nodePos.y - mousePos.y) ** 2);
+
+            if (distance <= 6) {
+            currentNode = node;
+            }
+        });
+
+        
+        const neighbors = getNeighbors(currentNode);
+        neighbors.nodes.push(currentNode);
+        node.style("opacity", 0.3);
+        link.style("opacity", 0.3);
+        const connectedNodes = neighbors.nodes;
+        const connectedEdges = neighbors.edges;
+        
+        
+        node.style("opacity", function(n) {
+            return connectedNodes.includes(n) ? 1 : 0.3;
+        });
+
+        link.style("opacity", function(e) {
+            return connectedEdges.includes(e) ? 1 : 0.3;
+        });
+
+        tooltip.selectAll("text")
+            .data(connectedNodes)
+            .join("text")
+            .text(d => d.id)
+            .attr("x", d => d.x+20)
+            .attr("y", d => d.y)
+            .style("font-size", "8.5px")
+            .style("text-anchor", "middle")
+            .style("opacity", 1);
+    })
+
+    .on("mouseout", function() {
+        node.style("opacity", 1);
+        link.style("opacity", 1);
+        tooltip.selectAll("text").style("opacity", 0);
+    });
+    });
+
+
+        
+    </script>
+</body>
+</html>

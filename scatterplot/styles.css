@@ -1,0 +1,106 @@
+
+
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2em 2em;
+    letter-spacing: -0.011em;
+    font-family: 'Inter var', sans-serif;
+    font-size: 16px;
+    color: #34495e;
+    background: #f8f9fa;
+}
+
+.title {
+    position: relative;
+    width: 600px;
+    margin-bottom: 0.2em;
+    display: flex;
+    justify-content: center;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    font-feature-settings: 'tnum' 1;
+}
+
+.description {
+    max-width: 40em;
+    margin-bottom: 1.0em;
+    font-size: 0.9em;
+    text-align: center;
+    line-height: 1.4em;
+    opacity: 0.5;
+}
+
+.wrapper {
+    position: relative;
+}
+
+svg text {
+    fill: #34495e;
+}
+
+.bounds-background {
+    fill: white;
+}
+
+.x-axis-label {
+    font-size: 1.4em;
+}
+
+.y-axis-label {
+    font-size: 1.4em;
+    text-anchor: middle;
+    transform: rotate(-90deg);
+}
+
+.tick line,
+.domain {
+    stroke: #cfd4d8;
+}
+
+.voronoi {
+    fill: transparent;
+}
+
+.histogram-area {
+    fill: #cbd2d7;
+}
+
+.right-histogram {
+    transform-origin: 0 70px;
+}
+
+.hover-line {
+    fill: #5758BB;
+    transition: all 0.2s ease-out;
+    opacity: 0.5;
+    pointer-events: none;
+    mix-blend-mode: color-burn;
+}
+
+.legend-value {
+    font-size: 0.76em;
+    text-anchor: middle;
+    font-feature-settings: 'tnum' 1;
+    transition: all 0.2s ease-out;
+}
+
+.legend-tick {
+    stroke: #34495e;
+}
+
+.legend-highlight-bar {
+    fill: rgba(255, 255, 255, 0.3);
+    stroke: white;
+    stroke-width: 2px;
+    pointer-events: none;
+    shape-rendering: crispEdges;
+}
+
+.legend-highlight-text {
+    text-anchor: middle;
+    font-size: 0.8em;
+    font-feature-settings: 'tnum' 1;
+}

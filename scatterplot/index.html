@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>D3.js Temperature Visualization</title>
+    <link rel="stylesheet" href="styles.css"></link>
+    <script src="src/d3.v6.js"></script>
+</head>
+<body>
+    <h1 class="title">Daily Temperature Ranges</h1>
+    <style>
+        .tooltip {
+            position: absolute;
+        }
+
+        .tooltip-box {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            width:300px;
+        }
+        
+        .tooltip-arrow {
+    position: absolute;
+    top:6px;
+    width: 14px;
+    height: 14px;
+    border-style: solid;
+    border-width: 2px;
+    border-color: black black black black;
+    border-radius: 50%;
+    
+    left: 1.5px;
+    transform: translateX(-50%);
+}
+    </style>
+    <div class="description">Daily minimum and maximum temperatures in New York City in 2018</div>
+    
+    <svg id="scatterplot" width="500" height="500"></svg>
+    
+    <div class="tooltip">
+        <div class="tooltip-box">
+            <p class="tooltip-text">.</p>
+        </div>
+        <div class="tooltip-arrow"></div><!-- using an additional circle to highlight the point -->
+    </div>
+    <script>
+        
+        async function drawScatter(){
+        const dataset = await d3.json("data/my_weather_data.json");
+        
+        let dimensions = {
+            width: 540,
+            height: 500,
+            margin: {
+            top: 50,
+            right: 90,
+            bottom: 50,
+            left: 50,
+            },
+            legendWidth: 250,
+            legendHeight: 26,
+        }
+        dimensions.boundedWidth = dimensions.width
+            - dimensions.margin.left
+            - dimensions.margin.right
+        dimensions.boundedHeight = dimensions.height
+            - dimensions.margin.top
+            - dimensions.margin.bottom
+
+        const wrapper = d3.select("#scatterplot")
+            .append("svg")
+            .attr("width", dimensions.width)
+            .attr("height", dimensions.height)
+
+        const bounds = wrapper.append("g")
+            .style("transform", `translate(${
+            dimensions.margin.left
+            }px, ${
+            dimensions.margin.top
+            }px)`)
+
+        const boundsBackground = bounds.append("rect")
+            .attr("class", "bounds-background")
+            .attr("x", 0)
+            .attr("width", dimensions.boundedWidth)
+            .attr("y", 0)
+            .attr("height", dimensions.boundedHeight)
+                
+                const newData = []
+                
+                dataset.forEach(d => {
+                
+                const dayOfYear = d3.timeDay.count(d3.timeYear(d3.timeParse("%Y-%m-%d")(d.date)), d3.timeParse("%Y-%m-%d")(d.date)) + 1
+                
+                if (newData[dayOfYear - 1]) {
+                    newData[dayOfYear - 1] = {
+                    ...newData[dayOfYear - 1],
+                    temperatureMin: Math.min(newData[dayOfYear - 1].temperatureMin, d.temperatureMin),
+                    temperatureMax: Math.max(newData[dayOfYear - 1].temperatureMax, d.temperatureMax),
+                    }
+                } else {
+                    
+                    newData[dayOfYear - 1] = {
+                    date: d.date,
+                    temperatureMin: d.temperatureMin,
+                    temperatureMax: d.temperatureMax,
+                    }
+                }
+                })
+
+                
+                const finalData = newData.filter(d => d)//set data attribute
+                
+                const weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const month = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                const final = finalData.map(d => {
+                    const date = new Date(d.date);
+                    const weekdayStr = weekday[date.getDay()];
+                    const monthStr = month[date.getMonth()];
+                    const day = date.getDate();
+                    const year = date.getFullYear();
+                    const dateStr = `${weekdayStr}, ${monthStr} ${day}, ${year}`;
+
+                    return {
+                        ...d,
+                        date: dateStr
+                };
+                });
+                
+       
+        const numberOfGradientStops = 10;
+        const gradientStops = d3.range(numberOfGradientStops).map(i => (i / (numberOfGradientStops - 1)));
+        
+        const dateExtent = d3.extent(finalData, d => new Date(d.date));
+
+        
+        const colorScale = d3.scaleSequential()
+                .interpolator(d3.interpolateRainbow)
+                .domain(dateExtent);
+        
+        
+
+        
+        const xScale = d3.scaleLinear()
+            .domain([0,100])
+            .range([50, 450]);
+
+        
+        const yScale = d3.scaleLinear()
+            .domain([0,100])
+            .range([450, 50]);//create scales
+
+        
+        const scatterplot = d3.select("#scatterplot");
+        const rings = d3.select("#ring")
+        scatterplot.selectAll("circle")
+            .data(finalData)
+            .enter()
+            .append("circle")
+            .attr("cx", d => xScale(d.temperatureMin))
+            .attr("cy", d => yScale(d.temperatureMax))
+            .attr("r", 3)
+            .attr("fill", d => colorScale(new Date(d.date)))
+            .style("opacity",1);
+        scatterplot.append("g")
+                    .attr("transform", "translate(0, 450)")
+                    .call(d3.axisBottom(xScale))
+                    .append("text")
+                    .attr("x",300)
+                    .attr("y", 30)
+                    .attr("dy", "0.20em")
+                    .style("text-anchor", "end")
+                    .text("Minimum Temperature (°F)");
+        scatterplot.append("g")
+                    .attr("transform", "translate(50, 0)")
+                    .call(d3.axisLeft(yScale))
+                    .append("text")
+                    .attr("x", -250)
+                    .attr("y", -25)
+                    .attr("text-anchor", "middle")
+                    .attr("transform", "rotate(-90)")
+                    .text("Maximum Temperature (°F)");// visualize data using a scatter plot
+        const gradient = bounds.append("defs")
+            .append("linearGradient")
+            .attr("id", "gradient")
+            .attr("gradientTransform", "rotate(0)")
+            
+        gradient.selectAll("stop")
+            .data(d3.range(11))
+            .join("stop")
+            .attr("offset", d => d * 10 + "%")
+            .attr("stop-color", d => colorScale(dateExtent[0].getTime() + (d / 10) * (dateExtent[1].getTime() - dateExtent[0].getTime())));
+
+        
+        const gradientRect=wrapper.append("rect")
+            .attr("x", 200)
+            .attr("y", 400)
+            .attr("width", 198)
+            .attr("height", 20)
+            .style("fill", "url(#gradient)")
+            .on("mousemove", handlemousemove)
+            .on("mouseout", handlemouseout);//filter and visualize the points when the mouse hovers to the color legend, 
+                                            //the time period is set as 30 days, the concrete dates ranges will be shown
+        const text = wrapper.append("text")
+            .attr("class", "text-tooltip")
+            .attr("x", 200)
+            .attr("y", 400)
+            .text("Jan")
+            
+        const gradientRectBox = gradientRect.node().getBoundingClientRect();
+        function handlemousemove(event){
+            const [x1, y1] = d3.pointer(event);
+            let x = x1-200;
+            
+            let percent = x/gradientRectBox.width;
+            console.log(percent)
+            let timeRange = d3.extent(finalData, d => new Date(d.date));
+            let timeDiff = timeRange[1].getTime() - timeRange[0].getTime();
+            let selectedTime = new Date(timeRange[0].getTime() + percent * timeDiff);
+            
+            let startDate = new Date(selectedTime.getTime() - 14 * 24 * 60 * 60 * 1000);
+            let endDate = new Date(selectedTime.getTime() + 15 * 24 * 60 * 60 * 1000);
+            
+            if (startDate < timeRange[0]) {
+                startDate = timeRange[0];
+                endDate = new Date(startDate.getTime() + 29 * 24 * 60 * 60 * 1000);
+            }
+            if (endDate > timeRange[1]) {
+                endDate = timeRange[1];
+                startDate = new Date(endDate.getTime() - 29 * 24 * 60 * 60 * 1000);
+            }
+            
+            d3.select(".tooltip")
+            .style("display","none")
+            scatterplot.selectAll("circle").style("opacity", 0);
+            scatterplot.selectAll("circle")
+                .filter(d => new Date(d.date) >= startDate && new Date(d.date) <= endDate)
+                .style("opacity", 1);
+            text.text(`${d3.timeFormat("%B %d")(startDate)} - ${d3.timeFormat("%B %d")(endDate)}`);
+        }
+        function handlemouseout(event){
+            scatterplot.selectAll("circle").style("opacity", 1);
+            d3.select(".tooltip")
+            .style("display","block")
+            text.text("Jan");
+        }
+        
+        
+        const delaunay = d3.Delaunay.from(finalData, d => xScale(d.temperatureMin), d => yScale(d.temperatureMax));
+        
+        const tooltip = d3.select(".tooltip")
+        .style("visibility", "hidden");
+        
+        scatterplot.on("mousemove", function(event) {
+            const [x, y] = d3.pointer(event);
+            const i = delaunay.find(x, y, 10);
+            const d = finalData[i];
+            const dp = final[i]
+            tooltip.select(".tooltip-text")
+                .html(`<strong>${dp.date}</strong><br>${d.temperatureMin}°F - ${d.temperatureMax}°F`);
+                //related information is displayed when the mouse hovers to the point using the fuzzy position
+            tooltip.style("visibility", "visible")
+                .style("top", yScale(d.temperatureMax)+130 + "px")
+                .style("left", xScale(d.temperatureMin)+500 + "px");
+           
+        }).on("mouseout", function() {
+            tooltip.style("visibility", "hidden");
+        });
+        
+    }
+    drawScatter();
+    </script>
+</body>
+</html>

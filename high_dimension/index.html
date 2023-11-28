@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link rel="stylesheet" href="src/styles.css" type="text/css"></link>
+
+        <title>Educational Attainment by Socioeconomic Status</title>
+    </head>
+    <body>
+        <h2 class="title">
+            What do people achieve within 12 years of starting high school?
+        </h2>
+        <p class="description">Simulated data based on a National Center for Education Statistics study of where high school sophomores are ten years later</p>
+
+        <div id="wrapper" class="wrapper">
+        </div>
+
+        <div class="source">Data from <a href="https://nces.ed.gov/programs/digest/d14/tables/dt14_104.91.asp">the U.S. Department of Education, National Center for Education Statistics, Education Longitudinal Study of 2002</a></div>
+
+        <script src="src/d3.v6.js"></script>
+        <script src="src//d3-timer.v1.min.js"></script>
+        <script>
+            async function drawChart(){
+                // Access education attributes and socioeconomic status
+                const dataset = await d3.json("data/education.json")
+                
+                const sexAccessor = d => d.sex
+                
+                const sexes = ["female", "male"]
+                const sexIds = d3.range(sexes.length)
+                
+                
+                
+                const educationAccessor = d => Object.keys(d).filter(key => key !== "sex" && key !== "ses");
+                const educationCategory = ["<High School", "High School", "Some Post-secondary", "Post-secondary", "Associate's", "Bachelor's and up"];
+                const educationRange = d3.range(educationCategory.length);
+                
+                const socioeconomicStatusAccessor = d => d.ses;
+                const socioeconomicStatusCategory = ["Low", "Middle", "High"];
+                const socioeconomicStatusRange = d3.range(socioeconomicStatusCategory.length);
+
+                // Stack probabilities
+                const stackedProbabilities = {};
+
+                
+                dataset.forEach(d => {
+                
+                    const ses = d.ses.charAt(0).toUpperCase() + d.ses.slice(1)
+                    const key = `${d.sex}-${ses}`;
+                    
+                    const a = []
+                    a.push(d["<High School"]/100)
+                    a.push(d["High School"]/100+a[0])
+                    a.push(d["Some Post-secondary"]/100+a[1])
+                    a.push(d["Post-secondary"]/100+a[2])
+                    a.push(d["Associate's"]/100+a[3])
+                    a.push(1)
+                    
+                    
+                    stackedProbabilities[key] = a;
+                    
+
+
+                });
+
+ 
+                // Create person
+                function generatePerson() {
+                const sex = getRandomValue(sexIds, sexes, sexAccessor);
+                const ses = getRandomValue(socioeconomicStatusRange, socioeconomicStatusCategory, socioeconomicStatusAccessor);
+                
+                const stackedProb = stackedProbabilities[`${sex}-${ses}`];
+                const randomNum = Math.random();
+                const educationLevel = stackedProb.findIndex(d => d > randomNum);
+                
+                const startTime = Date.now();
+                const yJitter = Math.floor(Math.random() * 30 -15);
+
+                return { sex, ses, education: educationCategory[educationLevel], startTime, yJitter };
+                }
+                
+                
+                function getRandomValue(range, category, accessor) {
+                const index = Math.floor(Math.random() * range.length);
+                return category[range[index]];
+                }
+                
+                
+                const width1 = d3.min([
+                    window.innerWidth * 0.9,
+                    1200
+                ])
+                let dimensions = {
+                    width: width1,
+                    height: 500,
+                    margin: {
+                    top: 10,
+                    right: 200,
+                    bottom: 10,
+                    left: 120,
+                    },
+                    pathHeight: 50,
+                    endsBarWidth: 15,
+                    enedingBarPadding:3,
+                }
+                dimensions.boundedWidth = dimensions.width - dimensions.margin.left - dimensions.margin.right
+                dimensions.boundedHeight = dimensions.height - dimensions.margin.top - dimensions.margin.bottom
+                
+                const wrapper = d3.select("#wrapper")
+                    .append("svg")
+                    .attr("width", dimensions.width)
+                    .attr("height", dimensions.height)
+
+                const bounds = wrapper.append("g")
+                    .style("transform", `translate(${dimensions.margin.left}px, ${dimensions.margin.top}px)`)
+                const xScale = d3.scaleLinear()
+                    .domain([0, 1])
+                    .range([0, dimensions.boundedWidth])
+                    .clamp(true);
+                // Add color
+                const colorScale = d3.scaleOrdinal()
+                    .domain(["Low", "Middle", "High"])
+                    .range(["green", "blue", "red"]);
+                const leftYScale = d3.scaleBand()
+                    .domain([2,1,0])
+                    .range([0, dimensions.boundedHeight])
+                    .paddingInner(0.2)
+                    .paddingOuter(0.1);
+
+                const leftLabels = bounds.append("g")
+                    .attr("class", "left-labels")
+                    .attr("transform", `translate(${-dimensions.margin.left / 2}, 0)`);
+                const lefttitle = bounds.append("g")
+                    .attr("class", "left-title")
+                    .attr("transform", `translate(${-dimensions.margin.left / 2}, 0)`);
+                const leftrect1 = bounds.append("g")
+                    .attr("class", "left-rect")
+                    .attr("transform", `translate(${-dimensions.margin.left / 2}, 0)`);
+                const leftrect2 = bounds.append("g")
+                    .attr("class", "left-rect")
+                    .attr("transform", `translate(${-dimensions.margin.left / 2}, 0)`);
+                const leftrect3 = bounds.append("g")
+                    .attr("class", "left-rect")
+                    .attr("transform", `translate(${-dimensions.margin.left / 2}, 0)`);
+                leftrect1.append("rect")
+                    .attr("x", 45)
+                    .attr("y", 55)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "red")
+                leftrect2.append("rect")
+                    .attr("x", 45)
+                    .attr("y", 215)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "blue")
+                leftrect3.append("rect")
+                    .attr("x", 45)
+                    .attr("y", 375)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "green")
+                
+                
+                leftYScale.domain().forEach((d, i) => {
+                leftLabels.append("text")
+                    .attr("x", 0)
+                    .attr("y", leftYScale(d) + leftYScale.bandwidth() / 2)
+                    .attr("dy", "0.32em")
+                    .attr("text-anchor", "end")
+                    .attr("class", "left-label")
+                    .text(socioeconomicStatusCategory[2-i])
+                    .classed("text-bold", true)
+                });
+                lefttitle.append("text")
+                    .attr("x", 0)
+                    .attr("y", -dimensions.margin.top / 2)
+                    .attr("dy", "0.32em")
+                    .attr("text-anchor", "end")
+                    .attr("class", "left-title")
+                    .text("Socioeconomic Status")
+                    .style("color", " grey")
+                const rightYScale = d3.scaleBand()
+                    .domain([5,4,3,2,1,0])
+                    .range([0, dimensions.boundedHeight])
+                    .paddingInner(0.2)
+                    .paddingOuter(0.1);
+                
+                const rightLabelsGroup = bounds.append("g")
+                .attr("class", "right-labels")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const rightTriGroup = bounds.append("g")
+                .attr("class", "right-tri")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const rightCircleGroup = bounds.append("g")
+                .attr("class", "right-circle")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const femalelegend = bounds.append("g")
+                .attr("class","female-legend")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const femaleline = bounds.append("g")
+                .attr("class","female-line")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const femaletext = bounds.append("g")
+                .attr("class","female-text")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const malelegend =  bounds.append("g")
+                .attr("class","male-legend")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const maleline = bounds.append("g")
+                .attr("class","male-line")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const maletext = bounds.append("g")
+                .attr("class","male-text")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value1 = bounds.append("g")
+                .attr("class","value1")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value2 = bounds.append("g")
+                .attr("class","value2")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value3 = bounds.append("g")  
+                .attr("class","value3")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value4 = bounds.append("g")
+                .attr("class","value4")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value5 = bounds.append("g")
+                .attr("class","value5")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value6 = bounds.append("g")
+                .attr("class","value6")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value7 = bounds.append("g")
+                .attr("class","value7")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value8 = bounds.append("g")
+                .attr("class","value8")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value9 = bounds.append("g")
+                .attr("class","value9")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value10 = bounds.append("g")
+                .attr("class","value10")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value11 = bounds.append("g")
+                .attr("class","value11")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value12 = bounds.append("g")
+                .attr("class","value12")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value13 = bounds.append("g")
+                .attr("class","value13")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value14 = bounds.append("g")
+                .attr("class","value14")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value15 = bounds.append("g")
+                .attr("class","value15")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value16 = bounds.append("g")
+                .attr("class","value16")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value17 = bounds.append("g")
+                .attr("class","value17")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value18 = bounds.append("g")
+                .attr("class","value18")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value19 = bounds.append("g")
+                .attr("class","value19")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value20 = bounds.append("g")
+                .attr("class","value20")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value21 = bounds.append("g")
+                .attr("class","value21")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value22 = bounds.append("g")
+                .attr("class","value22")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value23 = bounds.append("g")
+                .attr("class","value23")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value24 = bounds.append("g")
+                .attr("class","value24")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value25 = bounds.append("g")
+                .attr("class","value25")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value26 = bounds.append("g")
+                .attr("class","value26")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value27 = bounds.append("g")
+                .attr("class","value27")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value28 = bounds.append("g")
+                .attr("class","value28")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value29 = bounds.append("g")
+                .attr("class","value29")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value30 = bounds.append("g")
+                .attr("class","value30")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value31 = bounds.append("g")
+                .attr("class","value31")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value32 = bounds.append("g")
+                .attr("class","value32")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value33 = bounds.append("g")
+                .attr("class","value33")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value34 = bounds.append("g")
+                .attr("class","value34")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value35 = bounds.append("g")
+                .attr("class","value35")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const value36 = bounds.append("g")
+                .attr("class","value36")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+
+                
+
+                femalelegend.append("text")
+                .attr("x", -240)
+                .attr("y", 5-dimensions.margin.top / 2)
+                .text("▲")
+                femaleline.append("text")
+                .attr("x", -234)
+                .attr("y",20-dimensions.margin.top / 2)
+                .text("|")
+                femaletext.append("text")
+                .attr("x", -300)
+                .attr("y",5-dimensions.margin.top / 2)
+                .text("Female")
+                malelegend.append("text")
+                .attr("x", -215)
+                .attr("y", 5-dimensions.margin.top / 2)
+                .text("⬤")
+                maleline.append("text")
+                .attr("x", -210.5)
+                .attr("y",20-dimensions.margin.top / 2)
+                .text("|")
+                maletext.append("text")
+                .attr("x", -190)
+                .attr("y",5-dimensions.margin.top / 2)
+                .text("Male")
+                const rightYValues = [0, 1, 2, 3, 4, 5];
+
+                const rightLabels = rightLabelsGroup.selectAll(".right-label")
+                .data(rightYValues)
+                .enter()
+                .append("text")
+                .attr("class", "right-label")
+                .text((d, i) => ["<High School", "High School", "Some Post-secondary", "Post-secondary", "Associate's", "Bachelor's and up"][i])
+                .attr("x", -180)
+                .attr("y", d => rightYScale(d)-15+ rightYScale.bandwidth() / 2)
+                .attr("font-weight", "bold")
+                .attr("text-anchor", "start")
+               
+                const rightTris = rightLabelsGroup.selectAll(".right-tri")
+                .data(rightYValues)
+                .enter()
+                .append("text")
+                .attr("class", "right-label")
+                .text((d, i) => ["⬤", "⬤","⬤","⬤", "⬤","⬤"][i])
+                .attr("x", -180)
+                .attr("y", d => rightYScale(d)+8 + rightYScale.bandwidth() / 2)
+                .attr("font-weight", "bold")
+                .attr("text-anchor", "start")
+                const rightCircles = rightLabelsGroup.selectAll(".right-circle")
+                .data(rightYValues)
+                .enter()
+                .append("text")
+                .attr("class", "right-label")
+                .text((d, i) => ["▲", "▲","▲","▲", "▲","▲"][i])
+                .attr("x", -180)
+                .attr("y", d => rightYScale(d)+25 + rightYScale.bandwidth() / 2)
+                .attr("font-weight", "bold")
+                .attr("text-anchor", "start")
+                // Visualize path
+                const paths = [];
+                [0, 1, 2].forEach(sesId => {
+                [0,1,2,3,4,5].forEach(educationId => {
+                    const x1 = xScale(0);
+                    const y1 = leftYScale(sesId) + 128 / 2;
+                    const x2 = xScale(0.5);
+                    const y2 = rightYScale(educationId) + 64 / 2;
+                    const x3 = xScale(1);
+                    const x4 = xScale(0.4)
+                    const x5 = xScale(0.6)
+                    paths.push([[x1, y1], [x4, y1], [x5, y2], [x3, y2]]);
+                });
+                });
+                
+                const p = [[paths[0],paths[1],paths[2],paths[3],paths[4],paths[5]],[paths[6],paths[7],paths[8],paths[9],paths[10],paths[11]],[paths[12],paths[13],paths[14],paths[15],paths[16],paths[17]]]
+                
+                const pathGenerator = d3.line()
+                .x(d => d[0])
+                .y(d => d[1])
+                .curve(d3.curveMonotoneX);
+
+                const linksGroup = bounds.append("g");
+                
+                const links = linksGroup.selectAll(".category-path")
+                .data(paths)
+                .join("path")
+                .attr("class", "category-path")
+                .attr("d", pathGenerator)
+                .attr("stroke-width", dimensions.pathHeight);
+                const coverRect1 = linksGroup.append("rect")
+                    .attr("x", 840)
+                    .attr("y", 15)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect2 = linksGroup.append("rect")
+                    .attr("x", 865)
+                    .attr("y", 15)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect3 = linksGroup.append("rect")
+                    .attr("x", 840)
+                    .attr("y", 95)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect4 = linksGroup.append("rect")
+                    .attr("x", 865)
+                    .attr("y", 95)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect5 = linksGroup.append("rect")
+                    .attr("x", 840)
+                    .attr("y", 175)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect6 = linksGroup.append("rect")
+                    .attr("x", 865)
+                    .attr("y", 175)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect7 = linksGroup.append("rect")
+                    .attr("x", 840)
+                    .attr("y", 255)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect8 = linksGroup.append("rect")
+                    .attr("x", 865)
+                    .attr("y", 255)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect9 = linksGroup.append("rect")
+                    .attr("x", 840)
+                    .attr("y", 335)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect10 = linksGroup.append("rect")
+                    .attr("x", 865)
+                    .attr("y", 335)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect11 = linksGroup.append("rect")
+                    .attr("x", 840)
+                    .attr("y", 415)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const coverRect12 = linksGroup.append("rect")
+                    .attr("x", 865)
+                    .attr("y", 415)
+                    .attr("width", 15)
+                    .attr("height", 50)
+                    .attr("fill", "grey")
+                    .raise();
+                const barFeBa = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barMaBa = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barFeAs = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barMaAs = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barFePo = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barMaPo = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barFeSo = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barMaSo = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barFeHi = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barMaHi = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barFeLe = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const barMaLe = bounds.append("g")
+                .attr("class","bar")
+                .attr("transform", `translate(${dimensions.boundedWidth + dimensions.margin.right},0)`);
+                const maximumPeople = 10000
+                
+                const yTransitionProgressScale = d3.scaleLinear()
+                    .domain([0.4, 0.6])
+                    .range([0, 1])       
+                    .clamp(true)
+                const markersGroup = bounds.append("g")
+                    .attr("class", "markers-group")
+                
+                let current = 0;
+                let people = [];
+                let endGroup = []
+                
+                function updateMarkers() {
+    
+            const xProgressAccessor = d => (Date.now() - d.startTime) / 5000;
+            if (current < maximumPeople) {//filter
+                people = [
+                    ...people,
+                    ...d3.range(1).map(() => generatePerson()),
+                ];
+                current = current +1;
+            }
+            
+            
+            var jitter;
+            var sesID;
+            var educationID;
+            // Visualize persons
+            const markers = markersGroup.selectAll(".marker")
+                .data(people, d => d.id);
+
+            
+            const newMarkers = markers.enter()
+                .append("g")
+                .attr("class", "marker");
+
+            
+            newMarkers.filter(d => d.sex === "male")
+                .append("circle")
+                .attr("r", 5)
+                .attr("fill", d=> colorScale(d.ses));
+
+            
+            newMarkers.filter(d => d.sex === "female" )
+                .append("path")
+                .attr("d", d3.symbol().type(d3.symbolTriangle).size(30))
+                .attr("fill", d=> colorScale(d.ses));
+            
+            markers.merge(newMarkers)
+                .attr("transform", d => {
+                    const x = xScale(xProgressAccessor(d))
+                    sesID = {"Low": 0, "Middle": 1, "High": 2}[d.ses];
+                    educationID = {"<High School": 0, "High School": 1, "Some Post-secondary": 2, "Post-secondary": 3, "Associate's": 4, "Bachelor's and up": 5}[d.education];
+                    jitter = d.yJitter;
+                    
+                    const yStart = p[sesID][educationID][0][1];
+                    const yEnd = p[sesID][educationID][3][1];
+                    const yChange = yEnd - yStart;
+                    const yProgress = yTransitionProgressScale(xProgressAccessor(d));
+                    const y = yStart + (yChange * yProgress) + jitter;
+                    
+                    return `translate(${ x }, ${ y })`
+                })
+                
+                .transition().duration(100)
+                .style("opacity", d => xScale(xProgressAccessor(d)) < 0.5 ? 0 : 1);
+                
+
+
+            markers.exit().remove();
+            for (let i = 0; i < people.length; i++) {
+            if (xScale(xProgressAccessor(people[i])) >= dimensions.boundedWidth) {
+                endGroup.push(people[i]);
+            }
+            }
+            
+            let MaleBaL=0
+                let FemaleBaL=0
+                let MaleBaH=0
+                let FemaleBaH=0
+                let MaleBaM=0
+                let FemaleBaM=0
+                let MaleAsL=0
+                let FemaleAsL=0
+                let MaleAsH=0
+                let FemaleAsH=0
+                let MaleAsM=0
+                let FemaleAsM=0
+                let MalePoL=0
+                let FemalePoL=0
+                let MalePoH=0
+                let FemalePoH=0
+                let MalePoM=0
+                let FemalePoM=0
+                let MaleSoL=0
+                let FemaleSoL=0
+                let MaleSoH=0
+                let FemaleSoH=0
+                let MaleSoM=0
+                let FemaleSoM=0
+                let MaleHiL=0
+                let FemaleHiL=0
+                let MaleHiH=0
+                let FemaleHiH=0
+                let MaleHiM=0
+                let FemaleHiM=0
+                let MaleLeL=0
+                let FemaleLeL=0
+                let MaleLeH=0
+                let FemaleLeH=0
+                let MaleLeM=0
+                let FemaleLeM=0
+
+            MaleLeL = endGroup.filter(d=>d.sex === "male" && d.education === "<High School" && d.ses == "Low").length
+            MaleLeM = endGroup.filter(d=>d.sex === "male" && d.education === "<High School" && d.ses == "Middle").length
+            MaleLeH = endGroup.filter(d=>d.sex === "male" && d.education === "<High School" && d.ses == "High").length
+            FemaleLeL = endGroup.filter(d=>d.sex === "female" && d.education === "<High School" && d.ses == "Low").length
+            FemaleLeM = endGroup.filter(d=>d.sex === "female" && d.education === "<High School" && d.ses == "Middle").length
+            FemaleLeH = endGroup.filter(d=>d.sex === "female" && d.education === "<High School" && d.ses == "High").length
+            MaleHiL = endGroup.filter(d=>d.sex === "male" && d.education === "High School" && d.ses == "Low").length
+            MaleHiM = endGroup.filter(d=>d.sex == "male" && d.education === "High School" && d.ses == "Middle").length
+            MaleHiH = endGroup.filter(d=>d.sex == "male" && d.education === "High School" && d.ses == "High").length
+            FemaleHiL = endGroup.filter(d=>d.sex === "female" && d.education === "High School" && d.ses == "Low").length
+            FemaleHiM = endGroup.filter(d=>d.sex === "female" && d.education === "High School" && d.ses == "Middle").length
+            FemaleHiH = endGroup.filter(d=>d.sex === "female" && d.education === "High School" && d.ses == "High").length
+            MaleSoL = endGroup.filter(d=>d.sex === "male" && d.education === "Some Post-secondary" && d.ses == "Low").length
+            MaleSoM = endGroup.filter(d=>d.sex === "male" && d.education === "Some Post-secondary" && d.ses == "Middle").length
+            MaleSoH = endGroup.filter(d=>d.sex === "male" && d.education === "Some Post-secondary" && d.ses == "High").length
+            FemaleSoL = endGroup.filter(d=>d.sex === "female" && d.education === "Some Post-secondary" && d.ses == "Low").length
+            FemaleSoM = endGroup.filter(d=>d.sex === "female" && d.education === "Some Post-secondary" && d.ses == "Middle").length
+            FemaleSoH = endGroup.filter(d=>d.sex === "female" && d.education === "Some Post-secondary" && d.ses == "High").length
+            MalePoL = endGroup.filter(d=>d.sex === "male" && d.education ==="Post-secondary" && d.ses == "Low").length
+            MalePoM = endGroup.filter(d=>d.sex === "male" && d.education ==="Post-secondary" && d.ses == "Middle").length
+            MalePoH = endGroup.filter(d=>d.sex === "male" && d.education ==="Post-secondary" && d.ses == "High").length
+            FemalePoL = endGroup.filter(d=>d.sex === "female" && d.education ==="Post-secondary" && d.ses == "Low").length
+            FemalePoM = endGroup.filter(d=>d.sex === "female" && d.education ==="Post-secondary" && d.ses == "Middle").length
+            FemalePoH = endGroup.filter(d=>d.sex === "female" && d.education ==="Post-secondary" && d.ses == "High").length
+            MaleAsL = endGroup.filter(d=>d.sex === "male" && d.education ==="Associate's" && d.ses == "Low").length
+            MaleAsM = endGroup.filter(d=>d.sex === "male" && d.education ==="Associate's" && d.ses == "Middle").length
+            MaleAsH = endGroup.filter(d=>d.sex === "male" && d.education ==="Associate's" && d.ses == "High").length
+            FemaleAsL = endGroup.filter(d=>d.sex === "female" && d.education ==="Associate's" && d.ses == "Low").length
+            FemaleAsM = endGroup.filter(d=>d.sex === "female" && d.education === "Associate's" && d.ses == "Middle").length
+            FemaleAsH = endGroup.filter(d=>d.sex === "female" && d.education ==="Associate's" && d.ses == "High").length
+            MaleBaL = endGroup.filter(d=>d.sex === "male" && d.education === "Bachelor's and up" && d.ses === "Low").length
+            MaleBaM = endGroup.filter(d=>d.sex === "male" && d.education === "Bachelor's and up" && d.ses === "Middle").length
+            MaleBaH = endGroup.filter(d=>d.sex === "male" && d.education === "Bachelor's and up" && d.ses === "High").length
+            FemaleBaL = endGroup.filter(d=>d.sex === "female" && d.education === "Bachelor's and up" && d.ses === "Low").length
+            FemaleBaM = endGroup.filter(d=>d.sex === "female" && d.education === "Bachelor's and up" && d.ses === "Middle").length
+            FemaleBaH = endGroup.filter(d=>d.sex === "female" && d.education === "Bachelor's and up" && d.ses === "High").length
+
+            const t1 = 50;
+            const height1 = t1 * (FemaleBaH/(FemaleBaH+FemaleBaM+FemaleBaL));
+            const height2 = t1 * (FemaleBaM/(FemaleBaH+FemaleBaM+FemaleBaL));
+            const height3 = t1 * (FemaleBaL/(FemaleBaH+FemaleBaM+FemaleBaL));
+            // visualize bars
+            barFeBa.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height1+15)
+            .attr("width", 15)
+            .attr("height", height1)
+            .style("fill", "red")
+            
+
+            barFeBa.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height1 - height2+15)
+            .attr("width", 15)
+            .attr("height", height2)
+            .style("fill", "blue");
+
+            barFeBa.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height1 - height2 - height3+15)
+            .attr("width", 15)
+            .attr("height", height3)
+            .style("fill", "green")
+            
+            
+            const height4 = t1 * (MaleBaH/(MaleBaH + MaleBaL + MaleBaM));
+            const height5 = t1 *(MaleBaM/(MaleBaH + MaleBaL + MaleBaM));
+            const height6 = t1 *(MaleBaL/(MaleBaH + MaleBaL + MaleBaM));
+
+            
+            barMaBa.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height4+15)
+            .attr("width", 15)
+            .attr("height", height4)
+            .style("fill", "red")
+            
+
+            barMaBa.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height4 - height5+15)
+            .attr("width", 15)
+            .attr("height", height5)
+            .style("fill", "blue");
+
+            barMaBa.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height4 - height5 - height6+15)
+            .attr("width", 15)
+            .attr("height", height6)
+            .style("fill", "green")
+            
+            const height7 = t1*(FemaleAsH/(FemaleAsH+FemaleAsL+FemaleAsM));
+            const height8 = t1*(FemaleAsM/(FemaleAsH+FemaleAsL+FemaleAsM));
+            const height9 = t1*(FemaleAsL/(FemaleAsH+FemaleAsL+FemaleAsM));
+
+            barFeAs.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height7+95)
+            .attr("width", 15)
+            .attr("height", height7)
+            .style("fill", "red")
+            
+
+            barFeAs.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height7 - height8+95)
+            .attr("width", 15)
+            .attr("height", height8)
+            .style("fill", "blue");
+
+            barFeAs.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height7 - height8 - height9+95)
+            .attr("width", 15)
+            .attr("height", height9)
+            .style("fill", "green")
+
+            const height10 = t1*(MaleAsH/(MaleAsH+MaleAsL+MaleAsM))
+            const height11 = t1*(MaleAsM/(MaleAsH+MaleAsL+MaleAsM))
+            const height12 = t1*(MaleAsL/(MaleAsH+MaleAsL+MaleAsM))
+
+            barMaAs.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height10+95)
+            .attr("width", 15)
+            .attr("height", height10)
+            .style("fill", "red")
+            
+
+            barMaAs.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height10 - height11+95)
+            .attr("width", 15)
+            .attr("height", height11)
+            .style("fill", "blue");
+
+            barMaAs.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height10 - height11 - height12+95)
+            .attr("width", 15)
+            .attr("height", height12)
+            .style("fill", "green")
+
+            const height13 = t1*(FemalePoH/(FemalePoH+FemalePoM+FemalePoL))
+            const height14 = t1*(FemalePoM/(FemalePoH+FemalePoM+FemalePoL))
+            const height15 = t1*(FemalePoL/(FemalePoH+FemalePoM+FemalePoL))
+
+            barFePo.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height13+175)
+            .attr("width", 15)
+            .attr("height", height13)
+            .style("fill", "red")
+            
+
+            barFePo.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height13 - height14+175)
+            .attr("width", 15)
+            .attr("height", height14)
+            .style("fill", "blue");
+
+            barFePo.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height13 - height14 - height15+175)
+            .attr("width", 15)
+            .attr("height", height15)
+            .style("fill", "green")
+            
+            const height16 = t1*(MalePoH/(MalePoH+MalePoM+MalePoL))
+            const height17 = t1*(MalePoM/(MalePoH+MalePoM+MalePoL))
+            const height18 = t1*(MalePoL/(MalePoH+MalePoM+MalePoL))
+
+            barFePo.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height16+175)
+            .attr("width", 15)
+            .attr("height", height16)
+            .style("fill", "red")
+            
+
+            barFePo.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height16 - height17+175)
+            .attr("width", 15)
+            .attr("height", height17)
+            .style("fill", "blue");
+
+            barFePo.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height16 - height17 - height18+175)
+            .attr("width", 15)
+            .attr("height", height18)
+            .style("fill", "green")
+
+            const height19 = t1*(FemaleSoH/(FemaleSoH+FemaleSoM+FemaleSoL))
+            const height20 = t1*(FemaleSoM/(FemaleSoH+FemaleSoM+FemaleSoL))
+            const height21 = t1*(FemaleSoL/(FemaleSoH+FemaleSoM+FemaleSoL))
+
+            barFeSo.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height19+255)
+            .attr("width", 15)
+            .attr("height", height19)
+            .style("fill", "red")
+            
+
+            barFeSo.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height19 - height20+255)
+            .attr("width", 15)
+            .attr("height", height20)
+            .style("fill", "blue");
+
+            barFeSo.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height19 - height20 - height21+255)
+            .attr("width", 15)
+            .attr("height", height21)
+            .style("fill", "green")
+
+            const height22 = t1*(MaleSoH/(MaleSoH+MaleSoM+MaleSoL))
+            const height23 = t1*(MaleSoM/(MaleSoH+MaleSoM+MaleSoL))
+            const height24 = t1*(MaleSoL/(MaleSoH+MaleSoM+MaleSoL))
+
+            
+            barMaSo.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height22+255)
+            .attr("width", 15)
+            .attr("height", height22)
+            .style("fill", "red")
+            
+
+            barMaSo.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height22 - height23+255)
+            .attr("width", 15)
+            .attr("height", height23)
+            .style("fill", "blue");
+
+            barMaSo.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height22 - height23 - height24+255)
+            .attr("width", 15)
+            .attr("height", height24)
+            .style("fill", "green")
+
+            const height25 = t1*(FemaleHiH/(FemaleHiH+FemaleHiM+FemaleHiL))
+            const height26 = t1*(FemaleHiM/(FemaleHiH+FemaleHiM+FemaleHiL))
+            const height27 = t1*(FemaleHiL/(FemaleHiH+FemaleHiM+FemaleHiL))
+
+            barFeHi.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height25+335)
+            .attr("width", 15)
+            .attr("height", height25)
+            .style("fill", "red")
+            
+
+            barFeHi.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height25 - height26+335)
+            .attr("width", 15)
+            .attr("height", height26)
+            .style("fill", "blue");
+
+            barFeHi.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height25 - height26 - height27+335)
+            .attr("width", 15)
+            .attr("height", height27)
+            .style("fill", "green")
+
+            const height28 = t1*(MaleHiH/(MaleHiH+MaleHiM+MaleHiL))
+            const height29 = t1*(MaleHiM/(MaleHiH+MaleHiM+MaleHiL))
+            const height30 = t1*(MaleHiL/(MaleHiH+MaleHiM+MaleHiL))
+            
+            barMaHi.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height28+335)
+            .attr("width", 15)
+            .attr("height", height28)
+            .style("fill", "red")
+            
+
+            barMaHi.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height28 - height29+335)
+            .attr("width", 15)
+            .attr("height", height29)
+            .style("fill", "blue");
+
+            barMaHi.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height28 - height29 - height30+335)
+            .attr("width", 15)
+            .attr("height", height30)
+            .style("fill", "green")
+
+            const height31 = t1*(FemaleLeH/(FemaleLeH+FemaleLeM+FemaleLeL))
+            const height32 = t1*(FemaleLeM/(FemaleLeH+FemaleLeM+FemaleLeL))
+            const height33 = t1*(FemaleLeL/(FemaleLeH+FemaleLeM+FemaleLeL))
+
+            barFeLe.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height31+415)
+            .attr("width", 15)
+            .attr("height", height31)
+            .style("fill", "red")
+            
+
+            barFeLe.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height31 - height32+415)
+            .attr("width", 15)
+            .attr("height", height32)
+            .style("fill", "blue");
+
+            barFeLe.append("rect")
+            .attr("x", -240)
+            .attr("y", t1 - height31 - height32 - height33+415)
+            .attr("width", 15)
+            .attr("height", height33)
+            .style("fill", "green")
+
+            const height34 = t1*(MaleLeH/(MaleLeH+MaleLeM+MaleLeL))
+            const height35 = t1*(MaleLeM/(MaleLeH+MaleLeM+MaleLeL))
+            const height36 =t1*(MaleLeL/(MaleLeH+MaleLeM+MaleLeL))
+
+            barFeLe.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height34+415)
+            .attr("width", 15)
+            .attr("height", height34)
+            .style("fill", "red")
+            
+
+            barFeLe.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height34 - height35+415)
+            .attr("width", 15)
+            .attr("height", height35)
+            .style("fill", "blue");
+
+            barFeLe.append("rect")
+            .attr("x", -215)
+            .attr("y", t1 - height34 - height35 - height36+415)
+            .attr("width", 15)
+            .attr("height", height36)
+            .style("fill", "green")
+            // Update numbers
+            value1.selectAll("*").remove();
+            value1.append("text")
+                .attr("x", -150)
+                .attr("y", 452-dimensions.margin.top / 2)
+                .text(`${MaleLeL}`)
+                .attr("fill", "green")
+            value2.selectAll("*").remove();
+            value2.append("text")
+                .attr("x", -120)
+                .attr("y", 452-dimensions.margin.top / 2)
+                .text(`${MaleLeM}`)
+                .attr("fill", "blue")
+            value3.selectAll("*").remove()
+            value3.append("text")
+                .attr("x", -90)
+                .attr("y", 452-dimensions.margin.top / 2)
+                .text(`${MaleLeH}`)
+                .attr("fill", "red")
+            value4.selectAll("*").remove()
+            value4.append("text")
+                .attr("x", -150)
+                .attr("y", 472-dimensions.margin.top / 2)
+                .text(`${FemaleLeL}`)
+                .attr("fill", "green")
+            value5.selectAll("*").remove()
+            value5.append("text")
+                .attr("x", -120)
+                .attr("y", 472-dimensions.margin.top / 2)
+                .text(`${FemaleLeM}`)
+                .attr("fill", "blue")
+            value6.selectAll("*").remove()
+            value6.append("text")
+                .attr("x", -90)
+                .attr("y", 472-dimensions.margin.top / 2)
+                .text(`${FemaleLeH}`)
+                .attr("fill", "red")
+            value7.selectAll("*").remove()
+            value7.append("text")
+                .attr("x", -150)
+                .attr("y", 372-dimensions.margin.top / 2)
+                .text(`${MaleHiL}`)
+                .attr("fill", "green")
+            value8.selectAll("*").remove()
+            value8.append("text")
+                .attr("x", -120)
+                .attr("y", 372-dimensions.margin.top / 2)
+                .text(`${MaleHiM}`)
+                .attr("fill", "blue")
+            value9.selectAll("*").remove()
+            value9.append("text")
+                .attr("x", -90)
+                .attr("y", 372-dimensions.margin.top / 2)
+                .text(`${MaleHiH}`)
+                .attr("fill", "red")
+            value10.selectAll("*").remove()
+            value10.append("text")
+                .attr("x", -150)
+                .attr("y", 392-dimensions.margin.top / 2)
+                .text(`${FemaleHiL}`)
+                .attr("fill", "green")
+            value11.selectAll("*").remove()
+            value11.append("text")
+                .attr("x", -120)
+                .attr("y", 392-dimensions.margin.top / 2)
+                .text(`${FemaleHiM}`)
+                .attr("fill", "blue")
+            value12.selectAll("*").remove()
+            value12.append("text")
+                .attr("x", -90)
+                .attr("y", 392-dimensions.margin.top / 2)
+                .text(`${FemaleHiH}`)
+                .attr("fill", "red")
+            value13.selectAll("*").remove()
+            value13.append("text")
+                .attr("x", -150)
+                .attr("y", 292-dimensions.margin.top / 2)
+                .text(`${MaleSoL}`)
+                .attr("fill", "green")
+            value14.selectAll("*").remove()
+            value14.append("text")
+                .attr("x", -120)
+                .attr("y", 292-dimensions.margin.top / 2)
+                .text(`${MaleSoM}`)
+                .attr("fill", "blue")
+            value15.selectAll("*").remove()
+            value15.append("text")
+                .attr("x", -90)
+                .attr("y", 292-dimensions.margin.top / 2)
+                .text(`${MaleSoH}`)
+                .attr("fill", "red")
+            value16.selectAll("*").remove()
+            value16.append("text")
+                .attr("x", -150)
+                .attr("y", 312-dimensions.margin.top / 2)
+                .text(`${FemaleSoL}`)
+                .attr("fill", "green")
+            value17.selectAll("*").remove()
+            value17.append("text")
+                .attr("x", -120)
+                .attr("y", 312-dimensions.margin.top / 2)
+                .text(`${FemaleSoM}`)
+                .attr("fill", "blue")
+            value18.selectAll("*").remove()
+            value18.append("text")
+                .attr("x", -90)
+                .attr("y", 312-dimensions.margin.top / 2)
+                .text(`${FemaleSoH}`)
+                .attr("fill", "red")
+            value19.selectAll("*").remove()
+            value19.append("text")
+                .attr("x", -150)
+                .attr("y", 212-dimensions.margin.top / 2)
+                .text(`${MalePoL}`)
+                .attr("fill", "green")
+            value20.selectAll("*").remove()
+            value20.append("text")
+                .attr("x", -120)
+                .attr("y", 212-dimensions.margin.top / 2)
+                .text(`${MalePoM}`)
+                .attr("fill", "blue")
+            value21.selectAll("*").remove()
+            value21.append("text")
+                .attr("x", -90)
+                .attr("y", 212-dimensions.margin.top / 2)
+                .text(`${MalePoH}`)
+                .attr("fill", "red")
+            value22.selectAll("*").remove()
+            value22.append("text")
+                .attr("x", -150)
+                .attr("y", 232-dimensions.margin.top / 2)
+                .text(`${FemalePoL}`)
+                .attr("fill", "green")
+            value23.selectAll("*").remove()
+            value23.append("text")
+                .attr("x", -120)
+                .attr("y", 232-dimensions.margin.top / 2)
+                .text(`${FemalePoM}`)
+                .attr("fill", "blue")
+            value24.selectAll("*").remove()
+            value24.append("text")
+                .attr("x", -90)
+                .attr("y", 232-dimensions.margin.top / 2)
+                .text(`${FemalePoH}`)
+                .attr("fill", "red")
+            value25.selectAll("*").remove()
+            value25.append("text")
+                .attr("x", -150)
+                .attr("y", 132-dimensions.margin.top / 2)
+                .text(`${MaleAsL}`)
+                .attr("fill", "green")
+            value26.selectAll("*").remove()
+            value26.append("text")
+                .attr("x", -120)
+                .attr("y", 132-dimensions.margin.top / 2)
+                .text(`${MaleAsM}`)
+                .attr("fill", "blue")
+            value27.selectAll("*").remove()
+            value27.append("text")
+                .attr("x", -90)
+                .attr("y", 132-dimensions.margin.top / 2)
+                .text(`${MaleAsH}`)
+                .attr("fill", "red")
+            value28.selectAll("*").remove()
+            value28.append("text")
+                .attr("x", -150)
+                .attr("y", 152-dimensions.margin.top / 2)
+                .text(`${FemaleAsL}`)
+                .attr("fill", "green")
+            value29.selectAll("*").remove()
+            value29.append("text")
+                .attr("x", -120)
+                .attr("y", 152-dimensions.margin.top / 2)
+                .text(`${FemaleAsM}`)
+                .attr("fill", "blue")
+            value30.selectAll("*").remove()
+            value30.append("text")
+                .attr("x", -90)
+                .attr("y", 152-dimensions.margin.top / 2)
+                .text(`${FemaleAsH}`)
+                .attr("fill", "red")
+            value31.selectAll("*").remove()
+            value31.append("text")
+                .attr("x", -150)
+                .attr("y", 52-dimensions.margin.top / 2)
+                .text(`${MaleBaL}`)
+                .attr("fill", "green")
+            value32.selectAll("*").remove()
+            value32.append("text")
+                .attr("x", -120)
+                .attr("y", 52-dimensions.margin.top / 2)
+                .text(`${MaleBaM}`)
+                .attr("fill", "blue")
+            value33.selectAll("*").remove()
+            value33.append("text")
+                .attr("x", -90)
+                .attr("y", 52-dimensions.margin.top / 2)
+                .text(`${MaleBaH}`)
+                .attr("fill", "red")
+            value34.selectAll("*").remove()
+            value34.append("text")
+                .attr("x", -150)
+                .attr("y", 72-dimensions.margin.top / 2)
+                .text(`${FemaleBaL}`)
+                .attr("fill", "green")
+            value35.selectAll("*").remove()
+            value35.append("text")
+                .attr("x", -120)
+                .attr("y", 72-dimensions.margin.top / 2)
+                .text(`${FemaleBaM}`)
+                .attr("fill", "blue")
+            value36.selectAll("*").remove()
+            value36.append("text")
+                .attr("x", -90)
+                .attr("y", 72-dimensions.margin.top / 2)
+                .text(`${FemaleBaH}`)
+                .attr("fill", "red")
+            
+            people = people.filter(d => xScale(xProgressAccessor(d)) < dimensions.boundedWidth);//filter
+            
+        }
+           
+            d3.timer(updateMarkers)
+            
+
+
+
+
+}
+
+
+
+
+            
+            drawChart();
+        </script>
+    </body>
+
+</html>

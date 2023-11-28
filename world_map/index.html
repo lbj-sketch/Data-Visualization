@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link rel="stylesheet" href="src/styles.css"></link>
+        <title>DDA 2003/MDS 6112 Assignment 5</title>
+    </head>
+    <body>
+        
+        <div id="wrapper" class="wrapper">
+        <script src="src/d3.v6.js"></script>
+        <script>
+            async function drawMap(){
+                const countryShapes = await d3.json("data/world-geojson.json")
+                const dataset = await d3.csv("data/data_bank_data.csv")
+                
+                let metricDataByCountry = {};
+
+                for (let i = 0; i < dataset.length; i++) {
+                let item = dataset[i];
+                if (item["Series Name"] !== "Population growth (annual %)") {
+                    continue; 
+                }
+                let countryCode = item['Country Code'];
+                let growth = +item['2017 [YR2017]'] || 0; 
+                metricDataByCountry[countryCode] = growth;
+                }
+                const missingDataCountries = [];
+                countryShapes.features.forEach(feature => {
+                const countryCode = feature.properties.ADM0_A3_IS;
+                if (!metricDataByCountry.hasOwnProperty(countryCode)) {
+                    missingDataCountries.push(countryCode);
+                }
+                });
+                
+                missingDataCountries.forEach(countryCode => {
+                    metricDataByCountry[countryCode] = 0;
+                });
+                
+
+                const countries = countryShapes.features.reduce((acc, curr) => {
+                    acc[curr.properties.ADM0_A3_IS] = curr.properties.NAME;
+                    return acc;}, {});// Process data
+                
+
+                let dimensions = {
+                    width: window.innerWidth * 0.9,
+                    margin: {
+                    top: 10,
+                    right: 10,
+                    bottom: 10,
+                    left: 10,
+                    },
+                }
+                dimensions.boundedWidth = dimensions.width - dimensions.margin.left - dimensions.margin.right
+                const projection = d3.geoNaturalEarth1().fitWidth(dimensions.boundedWidth, countryShapes);
+
+                const pathGenerator = d3.geoPath(projection)
+                
+                const [[x0, y0], [x1, y1]] = pathGenerator.bounds(countryShapes); // Projection
+                dimensions.boundedHeight = y1
+                dimensions.height = dimensions.boundedHeight + dimensions.margin.top + dimensions.margin.bottom
+                const wrapper = d3.select("#wrapper")
+                    .append("svg")
+                    .attr("width", dimensions.width)
+                    .attr("height", dimensions.height)
+
+                const bounds = wrapper.append("g")
+                    .style("transform", `translate(${
+                        dimensions.margin.left
+                    }px, ${
+                        dimensions.margin.top
+                    }px)`)
+                const growthValues = Object.values(metricDataByCountry);
+                
+                const maxGrowth = d3.max(growthValues);
+                console.log(maxGrowth)
+                const colorScale = d3.scaleLinear()
+                    .domain([-maxGrowth, 0, maxGrowth])
+                    .range(["indigo", "white", "darkgreen"]);// Create color scale
+                console.log(colorScale(0.5))
+                bounds.append("path")
+                    .attr("class", "earth")
+                    .attr("d", pathGenerator({type: "Sphere"}));
+
+                bounds.append("path")
+                    .attr("class", "graticule")
+                    .attr("d", pathGenerator(d3.geoGraticule10()));
+                
+
+                const legendGroup = wrapper.append("g")
+                    .attr("transform", `translate(${120},${
+                        dimensions.width < 800
+                        ? dimensions.boundedHeight - 30
+                        : dimensions.boundedHeight * 0.5
+                        })`)
+
+                const legendTitle = legendGroup.append("text")
+                    .attr("y", -23)
+                    .attr("class", "legend-title")
+                    .text("Population growth")
+
+                const legendByline = legendGroup.append("text")
+                    .attr("y", -9)
+                    .attr("class", "legend-byline")
+                    .text("Percent change in 2017")
+
+
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const coords = [position.coords.longitude, position.coords.latitude];
+                    const [x, y] = projection(coords);
+                    const marker = bounds.append("circle")
+                        .attr("cx", x)
+                        .attr("cy", y)
+                        .attr("r", 8)
+                        .style("fill", "steelblue")
+                        .style("opacity", 1)
+                        .raise();
+                });// Mark location
+
+
+
+                const tooltip = d3.select(".tooltip")
+                const text1 = wrapper.append("text")
+                    .attr("text-anchor", "middle")
+                    .style("fill", "black")
+                    .style("font-weight", "bold")
+                    .style("pointer-events", "none")
+                    .style("user-select", "none")
+                    .attr("class", "text-tooltip")
+
+                const text2 = wrapper.append("text")
+                    .attr("text-anchor", "middle")
+                    .style("fill", "black")
+                    
+                    .style("pointer-events", "none")
+                    .style("user-select", "none")
+                    .attr("class", "text-tooltip")
+                const re = wrapper.append("g")
+
+                bounds.selectAll(".country")
+                    .data(countryShapes.features)
+                    .enter().append("path")
+                    .attr("class", "country")
+                    .attr("d", pathGenerator)
+                    .style("fill", d => {
+                        const countryCode = d.properties.ADM0_A3_IS;
+                        
+                        if (countryCode === "SSD"){
+                            console.log(countryCode)
+                        }
+                        
+                        const growth = metricDataByCountry[countryCode];
+                        return colorScale(growth);
+                    })// Visualize data
+                    .on("mousemove", (event, datum) => {
+                        const countryCode = datum.properties.ADM0_A3_IS;
+                        const countryName = countries[countryCode];
+                        const growth = metricDataByCountry[countryCode];
+                        const [x, y] = pathGenerator.centroid(datum);
+                        const left = x + dimensions.margin.left;
+                        const top = y + dimensions.margin.top;
+                        
+                        d3.select(event.target)
+                            .style("fill", "steelblue")
+                            .raise();
+                        text1.attr("x", left-195)
+                            .attr("y", top)
+                            .text(`${countryName}`)
+                            .style("opacity", 1)
+                            .raise()
+                        text2.attr("x", left-195)
+                            .attr("y", top + 20)
+                            .text(`${growth.toFixed(2)}% population change`)
+                            .style("opacity", 1)
+                            .raise()
+                        re.append("rect")
+                            .attr("x", left - 295)
+                            .attr("y", top - 20)
+                            .attr("width", 220)
+                            .attr("height", 50)
+                            .attr("fill", "white")
+                            .attr("opacity", 1)
+                            .attr("stroke", "black")
+                            .attr("stroke-width", 2)
+                    })
+                    .on("mouseout", (event, datum) => {
+                        
+                        const countryCode = datum.properties.ADM0_A3_IS;
+                        const growth = metricDataByCountry[countryCode];
+                        d3.select(event.target)
+                        .style("fill", colorScale(growth));
+
+                        text1.style("opacity", 0)
+                        text2.style("opacity", 0)
+                        re.selectAll("rect").remove()
+                        navigator.geolocation.getCurrentPosition((position) => {
+                            const coords = [position.coords.longitude, position.coords.latitude];
+                            const [x, y] = projection(coords);
+                            
+                            const marker = bounds.append("circle")
+                                .attr("cx", x)
+                                .attr("cy", y)
+                                .attr("r", 8)
+                                .style("fill", "steelblue")
+                                .style("opacity", 1)
+                                .raise();
+                        });
+                    });// Set up interaction
+
+
+                    const defs = wrapper.append("defs")
+                    const legendGradientId = "legend-gradient"
+                    const gradient = defs.append("linearGradient")
+                        .attr("id", legendGradientId)
+                        .selectAll("stop")
+                        .data(colorScale.range())
+                        .join("stop")
+                        .attr("stop-color", d => d)
+                        .attr("offset", (d, i) => `${
+                            i * 100 / 2 
+                        }%`)
+
+                    const legendWidth = 120
+                    const legendHeight = 16
+                    const legendGradient = legendGroup.append("rect")
+                        .attr("x", -legendWidth / 2)
+                        .attr("height", legendHeight)
+                        .attr("width", legendWidth)
+                        .style("fill", `url(#${legendGradientId})`)
+
+                    const legendValueRight = legendGroup.append("text")
+                        .attr("class", "legend-value")
+                        .attr("x", legendWidth / 2 + 10)
+                        .attr("y", legendHeight / 2)
+                        .text(`${d3.format(".1f")(maxGrowth)}%`)
+
+                    const legendValueLeft = legendGroup.append("text")
+                        .attr("class", "legend-value")
+                        .attr("x", -legendWidth / 2 - 10)
+                        .attr("y", legendHeight / 2)
+                        .text(`${d3.format(".1f")(-maxGrowth)}%`)
+                        .style("text-anchor", "end")
+                    
+            }
+            drawMap()
+        </script>
+    </body>
+</html>
